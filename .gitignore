@@ -1,0 +1,19 @@
+node_modules
+dist
+build
+.env
+.env.local
+.env.production
+.DS_Store
+.cache
+coverage
+.vscode/settings.json
+
+# Claude 本地配置（含敏感路径和权限）
+.claude/
+
+# 用户上传文件（含个人数据）
+uploads/
+
+# 本地启动脚本（含硬编码路径）
+打开个人宇宙.command

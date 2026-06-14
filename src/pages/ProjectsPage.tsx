@@ -19,6 +19,17 @@ export default function ProjectsPage() {
     setDraftProject(editingProject);
   }, [editingProject]);
 
+  useEffect(() => {
+    if (draftProject) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [draftProject]);
+
   const openEditor = (project: Project) => {
     setEditingProject(project);
   };
@@ -43,7 +54,7 @@ export default function ProjectsPage() {
 
   return (
     <section className="page-section inner-page">
-      <SectionTitle eyebrow="Projects" title="项目星图" description="3 到 5 个项目入口，后续可以逐步替换成真实作品。" />
+      <SectionTitle eyebrow="Projects" title="项目归档" description="集中展示可继续编辑、查看详情和管理资料的项目内容。" />
       <div className="project-grid">
         {projects.map((project, index) => (
           <ProjectCard key={project.id} project={project} index={index} onEdit={openEditor} />

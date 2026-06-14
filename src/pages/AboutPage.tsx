@@ -66,6 +66,17 @@ export default function AboutPage() {
     setDraftContent(aboutContent);
   }, [aboutContent]);
 
+  useEffect(() => {
+    if (activePanel || editingPanel) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [activePanel, editingPanel]);
+
   const openEditor = (panel: EditPanel) => {
     setDraftContent(aboutContent);
     setEditingPanel(panel);
@@ -88,8 +99,8 @@ export default function AboutPage() {
       <SectionTitle eyebrow="About" title="关于我" />
       <div className="about-layout">
         <motion.div className="portrait-panel" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <span style={{ color: '#9fd8ff', fontSize: 22, fontWeight: 800 }}>Jax</span>
+          <div className="portrait-stack">
+            <span className="portrait-name">Jax</span>
             <div className="portrait-symbol"><img src={avatarImage} alt="个人头像" /></div>
           </div>
         </motion.div>

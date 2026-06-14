@@ -1,6 +1,6 @@
 export const profile = {
   name: '你的名字',
-  headline: '把想法、项目和长期好奇心编排成一个持续运行的个人宇宙。',
+  headline: '把想法、项目和长期好奇心整理成一个清晰可浏览的个人作品集。',
   keywords: ['AI Creation', 'Product Sense', 'Long Game'],
   currentProject: '我正在搭建一个个人创意系统：它收纳项目、笔记、实验和未来可以被再次启动的灵感。',
   featuredEntry: '从这里进入我的代表项目、最近笔记和创作方向。',

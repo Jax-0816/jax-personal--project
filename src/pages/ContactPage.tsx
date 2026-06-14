@@ -10,7 +10,7 @@ export default function ContactPage() {
 
   return (
     <section className="page-section inner-page contact-page">
-      <SectionTitle eyebrow="Contact" title="联系我" description="这里先放占位联系方式，正式发布前再替换真实信息。" />
+      <SectionTitle eyebrow="Contact" title="联系我" description="用于合作、交流和后续项目沟通。正式发布前可在个人信息里替换真实邮箱。" />
       <div className="contact-grid">
         {contacts.map((item) => (
           <article key={item.label} className="contact-card">

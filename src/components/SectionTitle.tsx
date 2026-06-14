@@ -1,5 +1,5 @@
 interface SectionTitleProps {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   description?: string;
 }
@@ -7,7 +7,7 @@ interface SectionTitleProps {
 export default function SectionTitle({ eyebrow, title, description }: SectionTitleProps) {
   return (
     <div className="section-title">
-      <p>{eyebrow}</p>
+      {eyebrow ? <p>{eyebrow}</p> : null}
       <h2>{title}</h2>
       {description ? <span>{description}</span> : null}
     </div>

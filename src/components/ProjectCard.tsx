@@ -29,7 +29,8 @@ export default function ProjectCard({ project, index, onEdit }: ProjectCardProps
       <div className="project-card-footer">
         <span>{project.status}</span>
         <div className="project-card-actions">
-          <Link to={`/projects/${project.id}/space`}>打开</Link>
+          <Link to={`/projects/${project.id}`}>详情</Link>
+          <Link to={`/projects/${project.id}/space`}>工作台</Link>
           {onEdit ? <button type="button" onClick={() => onEdit(project)}>编辑</button> : null}
         </div>
       </div>

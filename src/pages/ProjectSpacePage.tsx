@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useEditableProjects } from '../hooks/useEditableProjects';
+import { formatDate, getCategory } from '../hooks/useDocuments';
 
 interface DocItem {
   id: string;
@@ -18,27 +19,78 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function typeIcon(category: string): string {
+  const map: Record<string, string> = {
+    image: '🖼️',
+    video: '🎬',
+    audio: '🎵',
+    pdf: '📄',
+    text: '📝',
+    archive: '📦',
+    other: '📎',
+  };
+  return map[category] || '📎';
+}
+
+function isPreviewable(mimetype: string, filename: string): boolean {
+  if (mimetype.startsWith('image/')) return true;
+  if (mimetype.includes('pdf')) return true;
+  if (mimetype.includes('text') || mimetype.includes('markdown') || mimetype.includes('json')) return true;
+  if (filename.endsWith('.md') || filename.endsWith('.json') || filename.endsWith('.txt')) return true;
+  return false;
+}
+
 export default function ProjectSpacePage() {
   const { id } = useParams();
   const { projects } = useEditableProjects();
   const project = projects.find((item) => item.id === id);
 
-  const [docs, setDocs] = useState<DocItem[]>([]);
+  const [projectDocs, setProjectDocs] = useState<DocItem[]>([]);
+  const [sharedDocs, setSharedDocs] = useState<DocItem[]>([]);
+  const [activeTab, setActiveTab] = useState<'project' | 'shared'>('project');
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchDocs = useCallback(async () => {
+  // Previewer State
+  const [previewDoc, setPreviewDoc] = useState<DocItem | null>(null);
+  const [previewContent, setPreviewContent] = useState<string>('');
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  const fetchProjectDocs = useCallback(async () => {
     if (!id) return;
     try {
       const res = await fetch(`/api/documents?projectId=${encodeURIComponent(id)}`);
-      if (res.ok) setDocs(await res.json());
+      if (res.ok) setProjectDocs(await res.json());
     } catch { /* ignore */ }
   }, [id]);
 
+  const fetchSharedDocs = useCallback(async () => {
+    try {
+      const res = await fetch('/api/documents');
+      if (res.ok) setSharedDocs(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([fetchProjectDocs(), fetchSharedDocs()]);
+  }, [fetchProjectDocs, fetchSharedDocs]);
+
   useEffect(() => {
-    fetchDocs();
-  }, [fetchDocs]);
+    refreshAll();
+  }, [refreshAll]);
+
+  // Lock body scroll when preview modal is open
+  useEffect(() => {
+    if (previewDoc) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [previewDoc]);
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -49,22 +101,70 @@ export default function ProjectSpacePage() {
       form.append('projectId', id);
       try {
         await fetch('/api/documents', { method: 'POST', body: form });
-        await fetchDocs();
+        await refreshAll();
       } catch { /* ignore */ }
       setUploading(false);
     },
-    [id, fetchDocs],
+    [id, refreshAll],
   );
 
   const handleDelete = useCallback(
     async (docId: string) => {
       try {
         await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
-        setDocs((prev) => prev.filter((d) => d.id !== docId));
+        await refreshAll();
       } catch { /* ignore */ }
     },
-    [],
+    [refreshAll],
   );
+
+  const handleLinkProject = useCallback(
+    async (docId: string, associate: boolean) => {
+      try {
+        const targetProjectId = associate ? id : null;
+        await fetch(`/api/documents/${docId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: targetProjectId }),
+        });
+        await refreshAll();
+      } catch { /* ignore */ }
+    },
+    [id, refreshAll],
+  );
+
+  const openPreview = async (doc: DocItem) => {
+    if (doc.mimetype.includes('pdf')) {
+      // PDF directly opens in a new tab for native preview
+      window.open(`/api/documents/${doc.id}`, '_blank');
+      return;
+    }
+    setPreviewDoc(doc);
+    if (doc.mimetype.startsWith('image/')) {
+      setPreviewContent('');
+      return;
+    }
+    setLoadingPreview(true);
+    setPreviewContent('加载中...');
+    try {
+      const res = await fetch(`/api/documents/${doc.id}`);
+      if (res.ok) {
+        const text = await res.text();
+        setPreviewContent(text);
+      } else {
+        setPreviewContent('加载预览内容失败。');
+      }
+    } catch {
+      setPreviewContent('加载预览内容出错。');
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDoc(null);
+    setPreviewContent('');
+  };
 
   if (!project) {
     return (
@@ -75,6 +175,8 @@ export default function ProjectSpacePage() {
       </section>
     );
   }
+
+  const currentDocs = activeTab === 'project' ? projectDocs : sharedDocs;
 
   return (
     <section className="page-section inner-page space-page">
@@ -106,55 +208,131 @@ export default function ProjectSpacePage() {
         </article>
 
         <article className="glass-panel space-panel space-upload">
-          <span className="space-panel-eyebrow">项目文档</span>
-          <div
-            className={`space-drop-zone ${dragOver ? 'drag-over' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-            onClick={() => fileInputRef.current?.click()}
-            role="button"
-            tabIndex={0}
-            aria-label="上传项目文档"
-          >
-            <span className="space-drop-icon">+</span>
-            <span>{uploading ? '上传中...' : '点击或拖拽上传文档'}</span>
+          <span className="space-panel-eyebrow">项目文档管理</span>
+          
+          {/* Tab Selection */}
+          <div className="space-tabs">
+            <button 
+              type="button" 
+              className={`space-tab-btn ${activeTab === 'project' ? 'active' : ''}`}
+              onClick={() => setActiveTab('project')}
+            >
+              项目专属文档 ({projectDocs.length})
+            </button>
+            <button 
+              type="button" 
+              className={`space-tab-btn ${activeTab === 'shared' ? 'active' : ''}`}
+              onClick={() => setActiveTab('shared')}
+            >
+              共享文档库 ({sharedDocs.length})
+            </button>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            hidden
-            onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
-          />
 
-          {docs.length > 0 ? (
+          {activeTab === 'project' ? (
+            <>
+              <div
+                className={`document-upload-zone ${dragOver ? 'drag-over' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+                onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                aria-label="上传项目文档"
+              >
+                <span className="document-upload-icon">+</span>
+                <p className="document-upload-text">
+                  {uploading ? '上传中...' : '拖拽项目文件到此处，或点击选择上传'}
+                </p>
+                <small className="document-upload-hint">上传的文件将自动绑定至当前项目</small>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
+              />
+            </>
+          ) : null}
+
+          {currentDocs.length > 0 ? (
             <div className="space-docs-list">
-              {docs.map((doc) => (
-                <div key={doc.id} className="space-doc-item">
-                  <a
-                    className="space-doc-name"
-                    href={`/api/documents/${doc.id}`}
-                    download={doc.name}
-                    title={doc.name}
-                  >
-                    {doc.name}
-                  </a>
-                  <span className="space-doc-meta">{formatSize(doc.size)}</span>
-                  <button
-                    type="button"
-                    className="space-doc-delete"
-                    onClick={() => { if (window.confirm('删除这个文档？')) handleDelete(doc.id); }}
-                    aria-label="删除文档"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+              {currentDocs.map((doc) => {
+                const category = getCategory(doc.mimetype);
+                const previewable = isPreviewable(doc.mimetype, doc.name);
+                return (
+                  <div key={doc.id} className="space-doc-item">
+                    <div className="document-card-icon space-doc-icon">
+                      {typeIcon(category)}
+                    </div>
+                    <div className="document-card-body space-doc-body">
+                      <a
+                        className="document-card-name"
+                        href={`/api/documents/${doc.id}`}
+                        download={doc.name}
+                        title={doc.name}
+                      >
+                        {doc.name}
+                      </a>
+                      <div className="document-card-meta">
+                        <span>{formatSize(doc.size)}</span>
+                        <span>{formatDate(doc.uploadedAt)}</span>
+                      </div>
+                    </div>
+                    <div className="space-doc-actions">
+                      {previewable ? (
+                        <button
+                          type="button"
+                          className="space-doc-action-btn"
+                          onClick={() => openPreview(doc)}
+                        >
+                          预览
+                        </button>
+                      ) : null}
+                      <a
+                        className="space-doc-action-btn"
+                        href={`/api/documents/${doc.id}`}
+                        download={doc.name}
+                      >
+                        下载
+                      </a>
+                      {activeTab === 'project' ? (
+                        <button
+                          type="button"
+                          className="space-doc-action-btn unlink-btn"
+                          onClick={() => handleLinkProject(doc.id, false)}
+                          title="解除项目关联，退回到共享技能库"
+                        >
+                          移至共享库
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="space-doc-action-btn link-btn"
+                          onClick={() => handleLinkProject(doc.id, true)}
+                          title="将此共享文件关联至当前项目"
+                        >
+                          关联到项目
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="space-doc-delete"
+                        onClick={() => { if (window.confirm(`确认要彻底删除「${doc.name}」吗？`)) handleDelete(doc.id); }}
+                        aria-label="删除文档"
+                        title="彻底删除"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <p className="space-hint" style={{ marginTop: 16, marginBottom: 0 }}>
-              还没有上传文档。
+            <p className="space-hint space-empty-hint">
+              {activeTab === 'project' ? '当前项目暂无专属文档，您可以在上方上传，或从共享文档库中关联已有文件。' : '共享文档库中没有可用的文件，您可以在“技能”页面上传，或在此关联已解除关联的文件。'}
             </p>
           )}
         </article>
@@ -164,6 +342,40 @@ export default function ProjectSpacePage() {
         <a className="text-link space-github" href={project.githubUrl} target="_blank" rel="noreferrer">
           查看 GitHub →
         </a>
+      ) : null}
+
+      {/* Previewer Modal */}
+      {previewDoc ? (
+        <div className="editor-backdrop" role="dialog" aria-modal="true" aria-label={`预览 ${previewDoc.name}`}>
+          <div className="previewer-modal">
+            <div className="previewer-header">
+              <div className="previewer-title-container">
+                <h2 className="previewer-title">{previewDoc.name}</h2>
+                <span className="previewer-subtitle">
+                  {formatSize(previewDoc.size)} | 上传于 {formatDate(previewDoc.uploadedAt)}
+                </span>
+              </div>
+              <button type="button" className="previewer-close" onClick={closePreview} aria-label="关闭预览">
+                ✕
+              </button>
+            </div>
+            <div className="previewer-content">
+              {loadingPreview ? (
+                <div className="previewer-loading">正在加载预览内容...</div>
+              ) : previewDoc.mimetype.startsWith('image/') ? (
+                <img 
+                  className="previewer-image" 
+                  src={`/api/documents/${previewDoc.id}`} 
+                  alt={previewDoc.name} 
+                />
+              ) : (
+                <pre className="previewer-text" tabIndex={0}>
+                  {previewContent}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
       ) : null}
     </section>
   );

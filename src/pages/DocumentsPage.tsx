@@ -61,7 +61,7 @@ export default function DocumentsPage() {
       <SectionTitle
         eyebrow="Skills"
         title="技能库"
-        description="存放和管理技能文档（Markdown），拖拽上传 .md 文件，构建你的技能知识体系。"
+        description="存放和管理技能文档、项目资料和可复用知识文件。"
       />
 
       {/* Upload zone */}
@@ -87,9 +87,9 @@ export default function DocumentsPage() {
         />
         <div className="document-upload-icon">+</div>
         <p className="document-upload-text">
-          {uploading ? '上传中...' : '拖拽 .md 技能文档到此处，或点击选择'}
+          {uploading ? '上传中...' : '拖拽文档到此处，或点击选择'}
         </p>
-        <small className="document-upload-hint">推荐上传 Markdown (.md) 格式的技能文档</small>
+        <small className="document-upload-hint">支持图片、PDF、文本、压缩包等常用资料格式</small>
         {uploadError ? <p className="document-upload-error">{uploadError}</p> : null}
       </div>
 
@@ -116,7 +116,7 @@ export default function DocumentsPage() {
         <p className="document-empty">加载失败：{error}</p>
       ) : filtered.length === 0 ? (
         <p className="document-empty">
-          {documents.length === 0 ? '还没有技能文档，拖拽 .md 文件到这里开始。' : '没有匹配的文档。'}
+          {documents.length === 0 ? '还没有文档，拖拽文件到这里开始。' : '没有匹配的文档。'}
         </p>
       ) : (
         <div className="document-grid">

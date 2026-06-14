@@ -16,6 +16,17 @@ const getSavedProjects = () => {
     const saved = window.localStorage.getItem(projectsStorageKey);
     if (!saved) return defaultProjects;
     const parsed = JSON.parse(saved) as Project[];
+
+    // Check if the saved project IDs match the default projects exactly
+    const savedIds = parsed.map((p) => p.id);
+    const defaultIds = defaultProjects.map((p) => p.id);
+    const isMatched = savedIds.length === defaultIds.length && savedIds.every((id) => defaultIds.includes(id));
+
+    if (!isMatched) {
+      window.localStorage.removeItem(projectsStorageKey);
+      return defaultProjects;
+    }
+
     return mergeWithDefaults(parsed);
   } catch {
     return defaultProjects;

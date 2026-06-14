@@ -1,71 +1,50 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { profile } from '../data/profile';
 import { projects } from '../data/projects';
-
-const particleEffectsStorageKey = 'personal-universe-particle-effects';
-const particleEffectsEvent = 'personal-universe-particle-effects-change';
-
-const getParticleEffectsEnabled = () => {
-  if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem(particleEffectsStorageKey) === 'on';
-};
+import type { WeatherData } from '../utils/weatherScene';
+import WeatherScene from './WeatherScene';
+import WeatherStatusBar from './WeatherStatusBar';
 
 export default function ScrollScene() {
   const ref = useRef<HTMLElement>(null);
-  const [particleEffectsEnabled, setParticleEffectsEnabled] = useState(getParticleEffectsEnabled);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [weatherError, setWeatherError] = useState(false);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] });
-  const heroScale = useTransform(scrollYProgress, [0, 0.42, 1], [1, 0.92, 0.82]);
-  const heroY = useTransform(scrollYProgress, [0, 0.55, 1], ['0%', '-10%', '-22%']);
-  const portalRotate = useTransform(scrollYProgress, [0, 1], [0, 52]);
-  const portalScale = useTransform(scrollYProgress, [0, 0.5, 1], [1, 1.18, 1.45]);
-
-  useEffect(() => {
-    const syncSetting = () => setParticleEffectsEnabled(getParticleEffectsEnabled());
-
-    window.addEventListener('storage', syncSetting);
-    window.addEventListener(particleEffectsEvent, syncSetting);
-
-    return () => {
-      window.removeEventListener('storage', syncSetting);
-      window.removeEventListener(particleEffectsEvent, syncSetting);
-    };
-  }, []);
-
-  const toggleParticleEffects = () => {
-    const nextValue = !particleEffectsEnabled;
-    window.localStorage.setItem(particleEffectsStorageKey, nextValue ? 'on' : 'off');
-    window.dispatchEvent(new Event(particleEffectsEvent));
-    setParticleEffectsEnabled(nextValue);
-  };
+  const heroScale = useTransform(scrollYProgress, [0, 0.52, 1], [1, 0.98, 0.94]);
+  const heroY = useTransform(scrollYProgress, [0, 0.55, 1], ['0%', '-3%', '-8%']);
 
   return (
-    <section ref={ref} className={particleEffectsEnabled ? 'immersive-scene' : 'immersive-scene particle-effects-off'}>
+    <section ref={ref} className="immersive-scene weather-immersive-scene">
+      <WeatherScene weather={weather} loading={weatherLoading} error={weatherError} />
       <div className="scene-sticky">
-        {particleEffectsEnabled ? (
-          <motion.div className="particle-portal" style={{ rotate: portalRotate, scale: portalScale }} aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </motion.div>
-        ) : null}
-        <motion.div className="hero-core" style={{ scale: heroScale, y: heroY }}>
-          <p className="hero-kicker">Personal Universe / Particle Field</p>
-          <h1>{profile.headline}</h1>
-          <p className="hero-copy">{profile.currentProject}</p>
-          <div className="keyword-row">
-            {profile.keywords.map((keyword) => (
-              <span key={keyword}>{keyword}</span>
-            ))}
+        <motion.div className="hero-core weather-hero-core" style={{ scale: heroScale, y: heroY }}>
+          <div className="hero-copy-panel">
+            <p className="hero-kicker">Personal Portfolio</p>
+            <h1>
+              <span>把运营经验、项目实践</span>
+              <span>和长期学习整理成</span>
+              <span>清晰的作品集。</span>
+            </h1>
+            <p className="hero-copy">{profile.currentProject}</p>
+            <div className="keyword-row">
+              {profile.keywords.map((keyword) => (
+                <span key={keyword}>{keyword}</span>
+              ))}
+            </div>
+            <div className="hero-actions">
+              <Link to="/projects">查看项目</Link>
+              <Link to="/about">了解经历</Link>
+              <a href="#weather-scene-panel">查看城市天气</a>
+            </div>
           </div>
-          <div className="hero-actions">
-            <Link to="/projects">进入项目星云</Link>
-            <Link to="/notes">读取笔记信号</Link>
-            <button className="particle-toggle" type="button" aria-pressed={particleEffectsEnabled} onClick={toggleParticleEffects}>
-              {particleEffectsEnabled ? '关闭粒子特效' : '开启粒子特效'}
-            </button>
-          </div>
+          <WeatherStatusBar
+            onWeatherChange={setWeather}
+            onLoadingChange={setWeatherLoading}
+            onErrorChange={setWeatherError}
+          />
         </motion.div>
       </div>
       <div className="story-steps">
@@ -78,7 +57,7 @@ export default function ScrollScene() {
             viewport={{ amount: 0.5 }}
             transition={{ duration: 0.72, ease: 'easeOut' }}
           >
-            <span>{String(index + 1).padStart(2, '0')} / {project.category}</span>
+            <span>{project.category} / {project.year}</span>
             <h2>{project.title}</h2>
             <p>{project.summary}</p>
             <Link to={'/projects/' + project.id}>进入详情</Link>

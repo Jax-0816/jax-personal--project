@@ -1,16 +1,16 @@
-# 个人宇宙空间
+# 个人作品集空间
 
-一个使用 React + Vite + TypeScript 构建的个人宇宙网站，采用自研 Canvas 粒子场作为全站沉浸式背景，支持内容在线编辑、文件上传管理。
+一个使用 React + Vite + TypeScript 构建的个人作品集网站，采用后端天气 API 驱动的首页天气场景，支持内容在线编辑、文件上传管理。
 
 ## 当前功能
 
-- **首页** — 粒子场沉浸入口、滚动驱动的视差叙事（ScrollScene）、精选项目与近期笔记入口
+- **首页** — 清爽个人介绍首屏、可切换城市的天气场景、精选项目与近期笔记入口
 - **关于我** — 个人画像、教育/工作经历、技能面板，支持在线编辑并持久化到 localStorage
 - **项目** — 项目卡片网格展示、独立详情页、项目专属工作空间（支持文件拖拽上传）
 - **文档库** — 全站文档/技能文件管理，支持拖拽上传、类型筛选、下载、删除
 - **笔记** — 笔记列表展示，标签分类
 - **联系** — Email、微信、GitHub 联系方式
-- **粒子特效** — Canvas 粒子系统，支持鼠标吸附、点击脉冲波纹、滚动色彩变化、响应式粒子密度、用户可开关（localStorage 持久化）
+- **天气场景** — Express 后端代理和风天气 API，首页背景随天气、温度、湿度、风力变化
 - **内容编辑** — 项目和关于页内容可在线编辑，localStorage 持久化，跨标签页同步
 - **AI 工作规则** — AGENTS.md 定义 AI 协作规则，skills/ 目录定义常用角色技能
 
@@ -21,10 +21,10 @@
 - TypeScript 5.8
 - React Router 7.6
 - Framer Motion 12.15
-- Canvas 粒子系统
+- CSS 天气场景系统
 - Express 5（文件上传 API）
 - Multer（文件处理）
-- CSS（BEM-ish 命名，玻璃拟态设计，暗色主题）
+- CSS（BEM-ish 命名，清爽作品集视觉系统，浅色主题 + 克制暗色功能面板）
 
 ## 项目结构
 
@@ -32,12 +32,13 @@
 src/
 ├── main.tsx                  # 入口：BrowserRouter → App
 ├── App.tsx                   # 路由定义（8 条路由）
-├── styles.css                # 全局样式（暗色主题、玻璃拟态、响应式）
+├── styles.css                # 全局样式（清爽作品集主题、响应式）
 ├── assets/
 │   └── avatar.jpg            # 头像
 ├── components/
-│   ├── Layout.tsx            # 外壳：粒子背景 + 固定顶栏 + <Outlet />
-│   ├── ParticleField.tsx     # Canvas 粒子系统
+│   ├── Layout.tsx            # 外壳：固定顶栏 + <Outlet />
+│   ├── WeatherScene.tsx      # 首页天气场景背景
+│   ├── WeatherStatusBar.tsx  # 首页天气场景卡片
 │   ├── ScrollScene.tsx       # 首页视差滚动叙事
 │   ├── ProjectCard.tsx       # 项目卡片
 │   ├── DocumentCard.tsx      # 文档卡片

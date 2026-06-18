@@ -6,6 +6,8 @@ import HomePage from './pages/HomePage';
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
+const NoteCreatePage = lazy(() => import('./pages/NoteCreatePage'));
+const NoteDetailPage = lazy(() => import('./pages/NoteDetailPage'));
 const NotesPage = lazy(() => import('./pages/NotesPage'));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
 const ProjectSpacePage = lazy(() => import('./pages/ProjectSpacePage'));
@@ -57,6 +59,22 @@ export default function App() {
           element={
             <Suspense fallback={<PageLoading />}>
               <NotesPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/notes/new"
+          element={
+            <Suspense fallback={<PageLoading />}>
+              <NoteCreatePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/notes/:id"
+          element={
+            <Suspense fallback={<PageLoading />}>
+              <NoteDetailPage />
             </Suspense>
           }
         />

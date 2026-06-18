@@ -40,6 +40,16 @@ export function getCategoryLabel(cat: string): string {
   return map[cat] || '其他';
 }
 
+function makeDefaultTextName(): string {
+  const date = new Date();
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `粘贴文本-${y}${m}${d}-${h}${min}`;
+}
+
 export function useDocuments() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +89,53 @@ export function useDocuments() {
     [],
   );
 
+  const createTextDocument = useCallback(async (name: string, content: string) => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) throw new Error('请先粘贴文字内容');
+
+    const res = await fetch('/api/documents/text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name.trim() || makeDefaultTextName(),
+        content: trimmedContent,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.error || '保存文本失败');
+    }
+
+    const newDoc = (await res.json()) as DocumentItem;
+    setDocuments((prev) => [newDoc, ...prev]);
+    return newDoc;
+  }, []);
+
+  const readDocumentText = useCallback(async (id: string) => {
+    const res = await fetch(`/api/documents/${id}`);
+    if (!res.ok) throw new Error('读取文本失败');
+    return res.text();
+  }, []);
+
+  const updateTextDocument = useCallback(async (id: string, name: string, content: string) => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) throw new Error('文本内容不能为空');
+
+    const res = await fetch(`/api/documents/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), content: trimmedContent }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.error || '更新文本失败');
+    }
+
+    const updatedDoc = (await res.json()) as DocumentItem;
+    setDocuments((prev) => prev.map((doc) => (doc.id === id ? updatedDoc : doc)));
+    return updatedDoc;
+  }, []);
+
   const deleteDocument = useCallback(async (id: string) => {
     const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('删除失败');
@@ -90,6 +147,9 @@ export function useDocuments() {
     loading,
     error,
     uploadDocuments,
+    createTextDocument,
+    readDocumentText,
+    updateTextDocument,
     deleteDocument,
     refresh: fetchDocuments,
     utils: { formatSize, formatDate, getCategory, getCategoryLabel },

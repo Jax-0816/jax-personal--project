@@ -33,10 +33,11 @@ function typeIcon(category: string): string {
 }
 
 function isPreviewable(mimetype: string, filename: string): boolean {
+  const normalizedFilename = filename.toLowerCase();
   if (mimetype.startsWith('image/')) return true;
   if (mimetype.includes('pdf')) return true;
   if (mimetype.includes('text') || mimetype.includes('markdown') || mimetype.includes('json')) return true;
-  if (filename.endsWith('.md') || filename.endsWith('.json') || filename.endsWith('.txt')) return true;
+  if (normalizedFilename.endsWith('.md') || normalizedFilename.endsWith('.json') || normalizedFilename.endsWith('.txt')) return true;
   return false;
 }
 
@@ -50,6 +51,7 @@ export default function ProjectSpacePage() {
   const [activeTab, setActiveTab] = useState<'project' | 'shared'>('project');
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [spaceError, setSpaceError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Previewer State
@@ -61,15 +63,21 @@ export default function ProjectSpacePage() {
     if (!id) return;
     try {
       const res = await fetch(`/api/documents?projectId=${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error('项目文档加载失败');
       if (res.ok) setProjectDocs(await res.json());
-    } catch { /* ignore */ }
+    } catch (err) {
+      setSpaceError(err instanceof Error ? err.message : '项目文档加载失败');
+    }
   }, [id]);
 
   const fetchSharedDocs = useCallback(async () => {
     try {
       const res = await fetch('/api/documents');
+      if (!res.ok) throw new Error('共享文档库加载失败');
       if (res.ok) setSharedDocs(await res.json());
-    } catch { /* ignore */ }
+    } catch (err) {
+      setSpaceError(err instanceof Error ? err.message : '共享文档库加载失败');
+    }
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -99,36 +107,49 @@ export default function ProjectSpacePage() {
       const form = new FormData();
       Array.from(files).forEach((f) => form.append('files', f));
       form.append('projectId', id);
+      setSpaceError(null);
       try {
-        await fetch('/api/documents', { method: 'POST', body: form });
+        const res = await fetch('/api/documents', { method: 'POST', body: form });
+        if (!res.ok) throw new Error('上传项目文件失败');
         await refreshAll();
-      } catch { /* ignore */ }
-      setUploading(false);
+      } catch (err) {
+        setSpaceError(err instanceof Error ? err.message : '上传项目文件失败');
+      } finally {
+        setUploading(false);
+      }
     },
     [id, refreshAll],
   );
 
   const handleDelete = useCallback(
     async (docId: string) => {
+      setSpaceError(null);
       try {
-        await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        const res = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('删除文档失败');
         await refreshAll();
-      } catch { /* ignore */ }
+      } catch (err) {
+        setSpaceError(err instanceof Error ? err.message : '删除文档失败');
+      }
     },
     [refreshAll],
   );
 
   const handleLinkProject = useCallback(
     async (docId: string, associate: boolean) => {
+      setSpaceError(null);
       try {
         const targetProjectId = associate ? id : null;
-        await fetch(`/api/documents/${docId}`, {
+        const res = await fetch(`/api/documents/${docId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectId: targetProjectId }),
         });
+        if (!res.ok) throw new Error(associate ? '关联项目失败' : '移至共享库失败');
         await refreshAll();
-      } catch { /* ignore */ }
+      } catch (err) {
+        setSpaceError(err instanceof Error ? err.message : associate ? '关联项目失败' : '移至共享库失败');
+      }
     },
     [id, refreshAll],
   );
@@ -209,6 +230,7 @@ export default function ProjectSpacePage() {
 
         <article className="glass-panel space-panel space-upload">
           <span className="space-panel-eyebrow">项目文档管理</span>
+          {spaceError ? <p className="space-error">{spaceError}</p> : null}
           
           {/* Tab Selection */}
           <div className="space-tabs">

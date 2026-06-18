@@ -2,12 +2,13 @@ import { Link } from 'react-router-dom';
 import ScrollScene from '../components/ScrollScene';
 import ProjectCard from '../components/ProjectCard';
 import SectionTitle from '../components/SectionTitle';
-import { notes } from '../data/notes';
 import { profile } from '../data/profile';
+import { useNotes } from '../hooks/useNotes';
 import { useEditableProjects } from '../hooks/useEditableProjects';
 
 export default function HomePage() {
   const { projects } = useEditableProjects();
+  const { notes, loading: notesLoading } = useNotes();
 
   return (
     <>
@@ -35,15 +36,19 @@ export default function HomePage() {
       </section>
       <section className="page-section content-orbit compact-orbit">
         <SectionTitle eyebrow="Recent Notes" title="最近记录" description="用更轻的方式沉淀学习、创作和项目过程。" />
-        <div className="note-list compact">
-          {notes.slice(0, 2).map((note) => (
-            <Link key={note.id} to="/notes" className="note-item glass-panel">
-              <span>{note.date}</span>
-              <strong>{note.title}</strong>
-              <p>{note.excerpt}</p>
-            </Link>
-          ))}
-        </div>
+        {notesLoading ? <p className="document-empty">加载中...</p> : null}
+        {!notesLoading && notes.length === 0 ? <p className="document-empty">还没有最近记录。</p> : null}
+        {!notesLoading && notes.length > 0 ? (
+          <div className="note-list compact">
+            {notes.slice(0, 2).map((note) => (
+              <Link key={note.id} to={`/notes/${note.id}`} className="note-item glass-panel">
+                <span>Recent Note</span>
+                <strong>{note.title}</strong>
+                <p>点击查看完整灵感内容，并继续编辑、整理或删除。</p>
+              </Link>
+            ))}
+          </div>
+        ) : null}
       </section>
     </>
   );

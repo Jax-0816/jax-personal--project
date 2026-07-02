@@ -17,3 +17,9 @@ uploads/
 
 # 本地启动脚本（含硬编码路径）
 打开个人宇宙.command
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example

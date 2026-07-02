@@ -13,7 +13,7 @@
 - **天气场景** — Express 后端代理和风天气 API，首页背景随天气、温度、湿度、风力变化，并提供本地 fallback 场景
 - **内容编辑** — 项目和关于页内容可在线编辑，localStorage 持久化，跨标签页同步
 - **产品约束** — PRODUCT.md 记录目标用户、品牌气质、设计原则和可访问性要求
-- **AI 工作规则** — AGENTS.md 定义 AI 协作规则，skills/ 目录定义常用角色技能
+- **AI 工作规则** — AGENTS.md 定义 AI 协作规则，skills/ 目录定义常用角色技能，`/codegraph` 用于优先通过 CodeGraph 理解代码结构和影响范围
 
 ## 技术栈
 
@@ -70,7 +70,7 @@ server/
 └── index.js                  # Express API 服务器（文件上传/下载、笔记 CRUD、天气代理）
 notes/                        # 灵感 Markdown 文件存储（含 _metadata.json 置顶信息）
 uploads/                      # 用户上传文件存储（含 _metadata.json 文档索引）
-skills/                       # AI 协作角色技能定义
+skills/                       # AI 协作角色技能定义（含 /codegraph 代码图谱检索）
 PRODUCT.md                    # 产品定位、设计原则与可访问性约束
 ```
 

@@ -13,6 +13,7 @@ const UPLOADS_DIR = path.join(PROJECT_DIR, 'uploads');
 const META_FILE = path.join(UPLOADS_DIR, '_metadata.json');
 const NOTES_DIR = path.join(PROJECT_DIR, 'notes');
 const NOTES_META_FILE = path.join(NOTES_DIR, '_metadata.json');
+const NOTE_DOCUMENTS_DIR = path.join(NOTES_DIR, 'documents');
 
 // Load environment variables from .env manually
 function loadEnv() {
@@ -38,6 +39,10 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 
 if (!fs.existsSync(NOTES_DIR)) {
   fs.mkdirSync(NOTES_DIR, { recursive: true });
+}
+
+if (!fs.existsSync(NOTE_DOCUMENTS_DIR)) {
+  fs.mkdirSync(NOTE_DOCUMENTS_DIR, { recursive: true });
 }
 
 // Load / save metadata
@@ -93,6 +98,81 @@ function normalizeTextDocumentName(name) {
   const raw = String(name || '').trim() || makeDefaultTextName();
   const safe = raw.replace(/[\\/:*?"<>|]/g, '-').slice(0, 120);
   return path.extname(safe).toLowerCase() === '.txt' ? safe : `${safe}.txt`;
+}
+
+function normalizeNoteDocumentName(name) {
+  const raw = String(name || '').trim() || makeDefaultTextName();
+  const withoutExt = raw.replace(/\.(txt|md|markdown)$/i, '');
+  const safe = withoutExt.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 120);
+  return `${safe || path.basename(makeDefaultTextName(), '.txt')}.md`;
+}
+
+function makeNoteDocumentId(name) {
+  const baseName = path.basename(normalizeNoteDocumentName(name), '.md');
+  const slug = baseName
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80) || 'text-document';
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}-${slug}`;
+}
+
+function ensureUniqueNoteDocumentId(baseId, currentId = null) {
+  let candidate = baseId;
+  let index = 2;
+
+  while (candidate !== currentId && fs.existsSync(path.join(NOTE_DOCUMENTS_DIR, `${candidate}.md`))) {
+    candidate = `${baseId}-${index}`;
+    index += 1;
+  }
+
+  return candidate;
+}
+
+function isNoteDocumentId(id) {
+  return String(id || '').startsWith('note:');
+}
+
+function stripNoteDocumentPrefix(id) {
+  return String(id || '').replace(/^note:/, '');
+}
+
+function getNoteDocumentPath(id) {
+  return path.join(NOTE_DOCUMENTS_DIR, `${stripNoteDocumentPrefix(id)}.md`);
+}
+
+function buildNoteDocumentItem(id) {
+  const cleanId = stripNoteDocumentPrefix(id);
+  const filePath = getNoteDocumentPath(cleanId);
+  const stat = fs.statSync(filePath);
+  const name = path.basename(filePath);
+
+  return {
+    id: `note:${cleanId}`,
+    name,
+    filename: path.join('notes', 'documents', name),
+    size: stat.size,
+    mimetype: 'text/markdown',
+    uploadedAt: stat.mtime.toISOString(),
+    projectId: null,
+    storage: 'notes',
+  };
+}
+
+function listNoteDocuments() {
+  if (!fs.existsSync(NOTE_DOCUMENTS_DIR)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(NOTE_DOCUMENTS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && path.extname(entry.name).toLowerCase() === '.md')
+    .map((entry) => buildNoteDocumentItem(path.basename(entry.name, '.md')));
 }
 
 function sanitizeNoteTitle(title) {
@@ -381,27 +461,13 @@ app.post('/api/documents/text', (req, res) => {
       return res.status(400).json({ error: 'Text content is required' });
     }
 
-    const id = uuidv4();
-    const name = normalizeTextDocumentName(req.body?.name);
-    const filename = `${id}.txt`;
-    const filePath = path.join(UPLOADS_DIR, filename);
+    const name = normalizeNoteDocumentName(req.body?.name);
+    const id = ensureUniqueNoteDocumentId(makeNoteDocumentId(name));
+    const filePath = path.join(NOTE_DOCUMENTS_DIR, `${id}.md`);
     const buffer = Buffer.from(content, 'utf8');
     fs.writeFileSync(filePath, buffer);
 
-    const docs = loadMetadata();
-    const doc = {
-      id,
-      name,
-      filename,
-      size: buffer.length,
-      mimetype: 'text/plain',
-      uploadedAt: new Date().toISOString(),
-      projectId: req.body?.projectId || null,
-    };
-
-    docs.push(doc);
-    saveMetadata(docs);
-    res.status(201).json(doc);
+    res.status(201).json(buildNoteDocumentItem(id));
   } catch (err) {
     console.error('Text document create error:', err);
     res.status(500).json({ error: 'Create text document failed' });
@@ -577,6 +643,7 @@ app.get('/api/documents', (req, res) => {
     // 独立技能库：如果没有指定 projectId，说明请求的是全局（技能库）文件
     // 此时需过滤掉所有关联了 projectId 的项目文件
     docs = docs.filter((d) => !d.projectId);
+    docs = [...docs, ...listNoteDocuments()];
   }
   docs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
   res.json(docs);
@@ -584,6 +651,18 @@ app.get('/api/documents', (req, res) => {
 
 // GET /api/documents/:id — download a document
 app.get('/api/documents/:id', (req, res) => {
+  if (isNoteDocumentId(req.params.id)) {
+    const filePath = getNoteDocumentPath(req.params.id);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on disk' });
+    }
+
+    const doc = buildNoteDocumentItem(req.params.id);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(doc.name)}`);
+    res.setHeader('Content-Type', doc.mimetype);
+    return fs.createReadStream(filePath).pipe(res);
+  }
+
   const docs = loadMetadata();
   const doc = docs.find((d) => d.id === req.params.id);
   if (!doc) {
@@ -603,6 +682,37 @@ app.get('/api/documents/:id', (req, res) => {
 // PATCH /api/documents/:id — update document metadata (e.g. projectId)
 app.patch('/api/documents/:id', (req, res) => {
   try {
+    if (isNoteDocumentId(req.params.id)) {
+      const currentId = stripNoteDocumentPrefix(req.params.id);
+      const currentPath = getNoteDocumentPath(currentId);
+      if (!fs.existsSync(currentPath)) {
+        return res.status(404).json({ error: 'File not found on disk' });
+      }
+
+      let nextId = currentId;
+      let nextPath = currentPath;
+
+      if (req.body.hasOwnProperty('name')) {
+        const nextName = normalizeNoteDocumentName(req.body.name);
+        nextId = ensureUniqueNoteDocumentId(makeNoteDocumentId(nextName), currentId);
+        nextPath = path.join(NOTE_DOCUMENTS_DIR, `${nextId}.md`);
+      }
+
+      if (req.body.hasOwnProperty('content')) {
+        const content = String(req.body.content || '').trim();
+        if (!content) {
+          return res.status(400).json({ error: 'Text content is required' });
+        }
+        fs.writeFileSync(currentPath, content, 'utf8');
+      }
+
+      if (nextId !== currentId) {
+        fs.renameSync(currentPath, nextPath);
+      }
+
+      return res.json(buildNoteDocumentItem(nextId));
+    }
+
     const docs = loadMetadata();
     const doc = docs.find((d) => d.id === req.params.id);
     if (!doc) {
@@ -650,6 +760,16 @@ app.patch('/api/documents/:id', (req, res) => {
 
 // DELETE /api/documents/:id — delete a document
 app.delete('/api/documents/:id', (req, res) => {
+  if (isNoteDocumentId(req.params.id)) {
+    const filePath = getNoteDocumentPath(req.params.id);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    fs.unlinkSync(filePath);
+    return res.json({ success: true });
+  }
+
   const docs = loadMetadata();
   const index = docs.findIndex((d) => d.id === req.params.id);
   if (index === -1) {

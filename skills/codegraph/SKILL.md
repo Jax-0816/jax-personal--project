@@ -19,7 +19,7 @@
 ## 使用示例
 
 ```bash
-codegraph explore "WeatherScene"
+codegraph explore "ScrollScene"
 codegraph explore "项目上传文件的调用链"
 codegraph explore "src/pages/ProjectSpacePage.tsx"
 ```
